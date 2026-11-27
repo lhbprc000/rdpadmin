@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- RdpAdmin: the workstation-side companion for RdpBan.
+       Single WinForms source file, .NET Framework 4.5.2 so it also runs on
+       Windows Server 2008 R2-era operator desktops. -->
+  <PropertyGroup>
+    <TargetFramework>net452</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>RdpAdmin</AssemblyName>
+    <ApplicationIcon>assets\rdpban.ico</ApplicationIcon>
+    <RootNamespace>RdpAdmin</RootNamespace>
+    <StartupObject>RdpAdmin.Program</StartupObject>
+    <LangVersion>7.3</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <DebugType>none</DebugType>
+    <Deterministic>true</Deterministic>
+    <NoWarn>CS0168;CS0219;CS0414;CS0649</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\radmin.cs" />
+    <Compile Include="src\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Builds net452 on machines that only ship newer targeting packs. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,39 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build RdpAdmin.csproj -c Release
+
+      - name: Show artifact
+        shell: pwsh
+        run: |
+          Get-Item bin\Release\net452\RdpAdmin.exe | Format-List Name,Length
+          Get-FileHash -Algorithm SHA256 bin\Release\net452\RdpAdmin.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RdpAdmin-${{ github.sha }}
+          path: bin/Release/net452/RdpAdmin.exe
+          if-no-files-found: error
+
+      # Release + signing (SignPath) is wired up separately; see
+      # CODE_SIGNING_POLICY.md. Signing happens on the built artifact, never on
+      # a developer machine.
