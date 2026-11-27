@@ -1,66 +1,85 @@
 # RdpAdmin
 
-面向「敲门式」RDP 主机的 Windows 服务器簿：把“敲门 + 连远程桌面”收进一个列表，点一下就走完。
+A Windows server book for operators of knock-gated RDP hosts: it keeps the server
+list, performs the knock, and opens the desktop — one click, no typing the same
+address, account and URL every day.
 
-这类主机的 RDP 端口平时是关着的，要先对敲门页发一次带令牌的请求（HTTP GET），
-服务端才会对来源 IP 临时放行。RdpAdmin 就是替操作员记住这些事的那一层：
+Hosts of this kind keep the RDP port closed until a request carrying a token
+hits the knock page (an HTTP GET); only then does the server temporarily admit
+the caller's source address. RdpAdmin remembers that part of the job:
 
-- 保存服务器清单：名称、地址、端口、登录账户、密码、敲门 URL、是否管理会话；
-- 首次连接当天先敲一次门；敲门失败不会把“今天已敲过”记上，下一次会重敲；
-- 密码用当前 Windows 用户的 DPAPI 加密后存在本地文件里，连接时通过 `CredWrite`
-  交给系统凭据库，再由系统自带的 `mstsc` 读走——密码不进命令行，也不进日志；
-- 不装服务、不写注册表、不联网上报任何数据。
+- stores the server list: name, address, port, logon account, password, knock
+  URL, and whether to open a console/management session;
+- knocks once per day before the first connection; a failed knock is not
+  recorded as done, so the next attempt knocks again;
+- seals the password with the current Windows user's DPAPI key on disk, then
+  hands it to the Windows credential store via `CredWrite` so the built-in
+  `mstsc` can read it — the password never appears on a command line or in a log;
+- installs no service, writes no registry values, and reports nothing anywhere.
 
-它不依赖任何特定的服务端实现：只要敲门页是"GET 一个带令牌的 URL、服务端按来源 IP 放行"
-这一种，就能用。RdpBan 的敲门 URL 是最常见的参考格式，但本工具不包含、也不修改
-它的过滤器、守护进程或控制台。
+It does not depend on a particular server-side implementation. Any knock page
+that grants access for the caller's source address by way of a tokenized URL
+works; the URL format produced by RdpBan is the reference implementation, but
+this tool contains and modifies none of its filter, daemon, or console code.
 
 Code signing policy: [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md)
 
-## 构建
+## Build
 
-需要 .NET SDK（任意能编译 net452 的版本；项目已引用
-`Microsoft.NETFramework.ReferenceAssemblies`，所以不必预装 4.5.2 targeting pack）。
+Requires a .NET SDK able to build `net452` (the project references
+`Microsoft.NETFramework.ReferenceAssemblies`, so the 4.5.2 targeting pack does
+not have to be installed separately).
 
 ```powershell
 dotnet build RdpAdmin.csproj -c Release
 ```
 
-产物在 `bin\Release\net452\RdpAdmin.exe`。单文件，无依赖，可直接拷走运行。
+The result is a single executable at `bin\Release\net452\RdpAdmin.exe` with no
+external dependencies — copy it and run.
 
-Windows Server 2008 R2 级别的操作机也能跑（.NET Framework 4.5 起）。
+It also runs on operator machines at the Windows Server 2008 R2 level
+(.NET Framework 4.5 or newer).
 
-## 使用
+## Usage
 
-1. 双击 `RdpAdmin.exe`；
-2. 「添加」一台服务器：填地址或名称（只填一个，另一个会自动跟上）、端口、账户、密码，
-   粘贴服务端给你的整条敲门 URL（RdpBan 控制台「敲门路径」窗口里给的就是这个格式）；
-3. 选中一行按「连接」：需要时先敲门，然后把密码交给系统凭据库并启动 `mstsc`。
+1. Start `RdpAdmin.exe`.
+2. Choose **Add** and fill in a server: address or name (fill either one and the
+   other follows), port, account, password, and paste the whole knock URL
+   provided by the server (the RdpBan console's "knock path" window shows exactly
+   this format).
+3. Select a row and choose **Connect**: it knocks first when needed, writes the
+   password to the credential store, and starts `mstsc`.
 
-数据存在当前用户的 `%LOCALAPPDATA%\RdpAdmin\servers.dat`。密码字段是 DPAPI 密文，
-换一个 Windows 账户复制这个文件解不开——这是有意的。
+Data lives in `%LOCALAPPDATA%\RdpAdmin\servers.dat` for the current user. The
+password field is a DPAPI blob; copying the file to another Windows account
+yields nothing usable — that is intentional.
 
-## 安全说明（请先读）
+## Security notes (read first)
 
-- 密码确实会以明文短暂存在于进程内存里（要交给 `CredWrite`，绕不开）；
-  它不会被写到磁盘明文、不会出现在命令行参数、不会进任何日志。
-- 敲门 URL 里通常带一次性/长期令牌，`servers.dat` 里存的是整条 URL；
-  这个文件按当前用户加密保护的范围**只有密码字段**，URL 与地址是明文。
-  别把 `servers.dat` 传到聊天工具或版本库。
-- 程序会调用系统 `mstsc.exe`，不会自带或替换远程桌面客户端。
-- 没有自动更新、没有遥测、没有后台常驻。
+- The password is briefly present in plaintext in process memory; it has to be,
+  to reach `CredWrite`. It is never written to disk in plaintext, never placed on
+  a command line, and never logged.
+- A knock URL usually carries a token, and `servers.dat` stores the whole URL.
+  Only the password field is protected by the per-user encryption — addresses and
+  URLs are plaintext. Do not send `servers.dat` through chat tools or commit it.
+- The program launches the system `mstsc.exe`; it neither ships nor replaces the
+  Remote Desktop client.
+- No auto-update, no telemetry, no background process.
 
-## 代码签名
+## Code signing
 
-发布包的签名策略见 [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md)。
-当前仓库里的本地构建默认未签名；正式 Release 在拿到证书后统一签名。
+Release signing policy: [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md).
+Local builds from this repository are unsigned by default; official releases are
+signed once a certificate is available.
 
-## 许可证
+## License
 
-MIT，见 [LICENSE](LICENSE)。
+MIT — see [LICENSE](LICENSE).
 
-## 背景
+## Background
 
-本仓库是独立发布的源码与构建：单个 WinForms 文件，没有外部依赖，构建脚本和 CI 都在仓库内。
-作者同时维护 RdpBan（RDP 防护与敲门服务端），本工具与它的敲门 URL 格式兼容，
-但代码、构建和发布完全独立；RdpBan 的过滤器、守护进程和控制台不在本仓库内。
+This repository is the standalone source and build: a single WinForms file, no
+external dependencies, with the build script and CI kept in-tree. The author also
+maintains RdpBan (an RDP protection and knock server), and this tool is compatible
+with its knock URL format, but the code, build and release here are independent;
+RdpBan's filter, daemon and console are not part of this repository.
